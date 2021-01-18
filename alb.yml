@@ -137,14 +137,14 @@ Resources:
 #       Tags: 
 #         - Key: Name
 #           Value: !Sub "${PJPrefix}-public2-route"
-# # Private1 RouteTable Create
-#   Private1RouteTable: 
-#     Type: "AWS::EC2::RouteTable"
-#     Properties: 
-#       VpcId: !Ref VPC 
-#       Tags: 
-#         - Key: Name
-#           Value: !Sub "${PJPrefix}-private1-route"
+# Private1 RouteTable Create
+  Private1RouteTable: 
+    Type: "AWS::EC2::RouteTable"
+    Properties: 
+      VpcId: !Ref VPC 
+      Tags: 
+        - Key: Name
+          Value: !Sub "${PJPrefix}-private1-route"
 
 # # Private2 RouteTable Create
 #   Private2RouteTable: 
@@ -166,6 +166,12 @@ Resources:
       RouteTableId: !Ref Public1RouteTable 
       DestinationCidrBlock: "0.0.0.0/0"
       GatewayId: !Ref InternetGateway 
+  PrivateRoute: 
+    Type: "AWS::EC2::Route"
+    Properties: 
+      RouteTableId: !Ref Private1RouteTable 
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref InternetGateway 
 
 # ------------------------------------------------------------#
 # RouteTable Associate
@@ -181,6 +187,17 @@ Resources:
     Properties: 
       SubnetId: !Ref Public2Subnet
       RouteTableId: !Ref Public1RouteTable
+
+  Private1SubnetRouteTableAssociation: 
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties: 
+      SubnetId: !Ref Private1Subnet
+      RouteTableId: !Ref Private1RouteTable
+  Private2SubnetRouteTableAssociation: 
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties: 
+      SubnetId: !Ref Private2Subnet
+      RouteTableId: !Ref Private1RouteTable
 
 # ------------------------------------------------------------#
 # EC2
