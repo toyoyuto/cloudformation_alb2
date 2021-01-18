@@ -1,0 +1,479 @@
+AWSTemplateFormatVersion: 
+  "2010-09-09"
+Description:
+  ALB construction
+  
+Metadata:
+  # コンソールでパラメータをグループ化およびソートする方法を定義するメタデータキー
+  "AWS::CloudFormation::Interface":
+    # パラメーターグループとそのグループに含めるパラメーターの定義
+    ParameterGroups: 
+      # Project名に関するグループ
+      - Label: 
+          default: "Project Name Prefix"
+        Parameters: 
+          - PJPrefix
+      # ネットワーク設定に関するグループ
+      - Label: 
+          default: "Network Configuration"
+        # 記述された順番に表示される
+        Parameters: 
+          - KeyName
+          
+    # パラメーターのラベル
+    ParameterLabels: 
+      KeyName: 
+        default: "Key Name"
+
+
+# ------------------------------------------------------------#
+# Input Parameters
+# ------------------------------------------------------------# 
+Parameters:
+  PJPrefix:
+    Type: String
+
+  KeyName:
+    Type: "AWS::EC2::KeyPair::KeyName"
+  
+Resources: 
+# ------------------------------------------------------------#
+#  VPC
+# ------------------------------------------------------------#
+# VPC Create
+  VPC: 
+    Type: "AWS::EC2::VPC"
+    Properties:
+      CidrBlock: "10.0.0.0/16"
+      # VPC に対して DNS 解決がサポートされているか
+      EnableDnsSupport: "true"
+      # VPC 内に起動されるインスタンスが DNS ホスト名を取得するか
+      EnableDnsHostnames: "true"
+      # VPC 内に起動されるインスタンスの許可されているテナンシー
+      InstanceTenancy: default
+      Tags: 
+        - Key: Name
+          Value: !Sub "${PJPrefix}-vpc"
+
+# InternetGateway Create
+  InternetGateway: 
+    Type: "AWS::EC2::InternetGateway"
+    Properties: 
+      Tags: 
+        - Key: Name
+          Value: !Sub "${PJPrefix}-igw"
+
+# IGW Attach
+  InternetGatewayAttachment: 
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties: 
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC 
+
+# ------------------------------------------------------------#
+#  Subnet
+# ------------------------------------------------------------#          
+# Public1 Subnet Create
+  Public1Subnet: 
+    Type: "AWS::EC2::Subnet"
+    Properties: 
+      AvailabilityZone: "ap-northeast-1a"
+      CidrBlock: "10.0.0.0/24"
+      VpcId: !Ref VPC 
+      Tags: 
+        - Key: Name
+          Value: !Sub "${PJPrefix}-public1-subnet"
+                    
+# Public2 Subnet Create
+  Public2Subnet: 
+    Type: "AWS::EC2::Subnet"
+    Properties: 
+      AvailabilityZone: "ap-northeast-1c"
+      CidrBlock: "10.0.1.0/24"
+      VpcId: !Ref VPC 
+      Tags: 
+        - Key: Name
+          Value: !Sub "${PJPrefix}-public2-subnet"
+
+# Private1 Subnet Create
+  Private1Subnet: 
+    Type: "AWS::EC2::Subnet"
+    Properties: 
+      AvailabilityZone: "ap-northeast-1a"
+      CidrBlock: "10.0.10.0/24"
+      VpcId: !Ref VPC 
+      Tags: 
+        - Key: Name
+          Value: !Sub "${PJPrefix}-private1-subnet"
+                    
+# Private2 Subnet Create
+  Private2Subnet: 
+    Type: "AWS::EC2::Subnet"
+    Properties: 
+      AvailabilityZone: "ap-northeast-1c"
+      CidrBlock: "10.0.11.0/24"
+      VpcId: !Ref VPC 
+      Tags: 
+        - Key: Name
+          Value: !Sub "${PJPrefix}-private2-subnet"
+                    
+# ------------------------------------------------------------#
+#  RouteTable
+# ------------------------------------------------------------#          
+# Public1 RouteTable Create
+  Public1RouteTable: 
+    Type: "AWS::EC2::RouteTable"
+    Properties: 
+      VpcId: !Ref VPC 
+      Tags: 
+        - Key: Name
+          Value: !Sub "${PJPrefix}-public1-route"
+
+# # Public2 RouteTable Create
+#   Public2RouteTable: 
+#     Type: "AWS::EC2::RouteTable"
+#     Properties: 
+#       VpcId: !Ref VPC 
+#       Tags: 
+#         - Key: Name
+#           Value: !Sub "${PJPrefix}-public2-route"
+# # Private1 RouteTable Create
+#   Private1RouteTable: 
+#     Type: "AWS::EC2::RouteTable"
+#     Properties: 
+#       VpcId: !Ref VPC 
+#       Tags: 
+#         - Key: Name
+#           Value: !Sub "${PJPrefix}-private1-route"
+
+# # Private2 RouteTable Create
+#   Private2RouteTable: 
+#     Type: "AWS::EC2::RouteTable"
+#     Properties: 
+#       VpcId: !Ref VPC 
+#       Tags: 
+#         - Key: Name
+#           Value: !Sub "${PJPrefix}-private2-route"
+
+
+# ------------------------------------------------------------#
+# Routing
+# ------------------------------------------------------------# 
+# Public Route Create
+  PublicRoute: 
+    Type: "AWS::EC2::Route"
+    Properties: 
+      RouteTableId: !Ref Public1RouteTable 
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref InternetGateway 
+
+# ------------------------------------------------------------#
+# RouteTable Associate
+# ------------------------------------------------------------# 
+# Public1RouteTable Associate PublicSubnet
+  Public1SubnetRouteTableAssociation: 
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties: 
+      SubnetId: !Ref Public1Subnet
+      RouteTableId: !Ref Public1RouteTable
+  Public2SubnetRouteTableAssociation: 
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties: 
+      SubnetId: !Ref Public2Subnet
+      RouteTableId: !Ref Public1RouteTable
+
+# ------------------------------------------------------------#
+# EC2
+# ------------------------------------------------------------# 
+  # Web1Serverインスタンス
+  Web1Server: 
+    Type: AWS::EC2::Instance
+    Properties: 
+      ImageId: ami-00f045aed21a55240
+      KeyName: !Ref KeyName
+      InstanceType: t2.micro
+      NetworkInterfaces: 
+        # IPv4 アドレスを割り当てるか
+        - AssociatePublicIpAddress: "true"
+          # ------------------------------------------------------
+          # アタッチの順序におけるネットワークインターフェイスの位置。
+          # ネットワークインターフェイスを指定する場合必須
+          # ------------------------------------------------------
+          DeviceIndex: "0"
+          SubnetId: !Ref Private1Subnet
+          GroupSet:
+            - !Ref Web1ServerSG
+
+      # インスタンスの作成時に実行するコマンドなどを記述
+      UserData: !Base64 |
+        #!/bin/bash
+        yum update -y
+        amazon-linux-extras install -y lamp-mariadb10.2-php7.2 php7.2
+        yum install -y httpd mariadb-server
+        systemctl start httpd
+        systemctl enable httpd
+        usermod -a -G apache ec2-user
+        chown -R ec2-user:apache /var/www
+        chmod 2775 /var/www
+        find /var/www -type d -exec chmod 2775 {} \;
+        find /var/www -type f -exec chmod 0664 {} \;
+        echo `hostname` > /var/www/html/index.html
+
+      Tags:
+          - Key: Name
+            Value: !Sub "${PJPrefix}-web1-server"
+
+  # Web1Serverセキュリティグループ
+  Web1ServerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: web1-sg-cf
+      GroupDescription: web1 server sg
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${PJPrefix}-web1-server-sg"
+          
+  # Web1ServerSGのインプットルール
+  Web1ServerSGIngress: 
+    Type: "AWS::EC2::SecurityGroupIngress"
+    Properties: 
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      SourceSecurityGroupId: !GetAtt [ ALBSecurityGroup, GroupId ] 
+      GroupId: !GetAtt [ Web1ServerSG, GroupId ]
+
+  # Web2Serverインスタンス
+  Web2Server: 
+    Type: AWS::EC2::Instance
+    Properties: 
+      ImageId: ami-00f045aed21a55240
+      KeyName: !Ref KeyName
+      InstanceType: t2.micro
+      NetworkInterfaces: 
+        # IPv4 アドレスを割り当てるか
+        - AssociatePublicIpAddress: "true"
+          # ------------------------------------------------------
+          # アタッチの順序におけるネットワークインターフェイスの位置。
+          # ネットワークインターフェイスを指定する場合必須
+          # ------------------------------------------------------
+          DeviceIndex: "0"
+          SubnetId: !Ref Private2Subnet
+          GroupSet:
+            - !Ref Web2ServerSG
+
+      # インスタンスの作成時に実行するコマンドなどを記述
+      UserData: !Base64 |
+        #!/bin/bash
+        yum update -y
+        amazon-linux-extras install -y lamp-mariadb10.2-php7.2 php7.2
+        yum install -y httpd mariadb-server
+        systemctl start httpd
+        systemctl enable httpd
+        usermod -a -G apache ec2-user
+        chown -R ec2-user:apache /var/www
+        chmod 2775 /var/www
+        find /var/www -type d -exec chmod 2775 {} \;
+        find /var/www -type f -exec chmod 0664 {} \;
+        echo `hostname` > /var/www/html/index.html
+
+      Tags:
+          - Key: Name
+            Value: !Sub "${PJPrefix}-web2-server"
+
+  # Web2Serverセキュリティグループ
+  Web2ServerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: web2-sg-cf
+      GroupDescription: web2 server sg
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${PJPrefix}-web2-server-sg"
+
+  # Web2ServerSGのインプットルール
+  Web2ServerSGIngress: 
+    Type: "AWS::EC2::SecurityGroupIngress"
+    Properties: 
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      SourceSecurityGroupId: !GetAtt [ ALBSecurityGroup, GroupId ] 
+      GroupId: !GetAtt [ Web2ServerSG, GroupId ]
+
+# ------------------------------------------------------------#
+#  Target Group
+# ------------------------------------------------------------#
+  TargetGroup: 
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+    Properties: 
+      VpcId: !Ref VPC
+      Name: !Sub "${PJPrefix}-tg"
+      # ターゲットにトラフィックをルーティングするために使用するプロトコル
+      Protocol: HTTP
+      Port: 80
+      # ターゲットでヘルスチェックを実行するときにロードバランサーが使用するプロトコル
+      HealthCheckProtocol: HTTP
+      # ヘルスチェックのターゲットの送信先である
+      HealthCheckPath: "/"
+      # ターゲットでヘルスチェックを実行するときにロードバランサーが使用するポート
+      HealthCheckPort: "traffic-port"
+      # 非正常なインスタンスが正常であると見なすまでに必要なヘルスチェックの連続成功回数
+      HealthyThresholdCount: 2
+      # ターゲットが異常であると見なされるまでに必要なヘルスチェックの連続失敗回数
+      UnhealthyThresholdCount: 2
+      # ヘルスチェックを失敗と見なす、ターゲットからレスポンスがない時間
+      HealthCheckTimeoutSeconds: 5
+      # 個々のターゲットのヘルスチェックの概算間隔 
+      HealthCheckIntervalSeconds: 10
+      # ターゲットからの正常なレスポンスを確認するために使用する HTTP コード
+      Matcher: 
+        HttpCode: 200
+      Tags: 
+        - Key: Name
+          Value: !Sub "${PJPrefix}-tg"
+      # ターゲットグループの属性
+      TargetGroupAttributes:
+        # 登録解除するターゲットの状態が draining から unused に変わるのをELBが待機する時間
+        - Key: "deregistration_delay.timeout_seconds"
+          Value: 300
+        # スティッキーセッションが有効か¥
+        - Key: "stickiness.enabled"
+          Value: false
+        # スティッキーセッションのタイプ
+        - Key: "stickiness.type"
+          Value: lb_cookie
+        # クライアントからのリクエストを同じターゲットにルーティングする必要がある期間
+        - Key: "stickiness.lb_cookie.duration_seconds"
+          Value: 86400
+      Targets: 
+        - Id: !Ref Web1Server
+          Port: 80
+        - Id: !Ref Web2Server
+          Port: 80
+
+# ------------------------------------------------------------#
+#  ALB
+# ------------------------------------------------------------#
+  InternetALB: 
+    Type: "AWS::ElasticLoadBalancingV2::LoadBalancer"
+    Properties: 
+      Name: !Sub "${PJPrefix}-alb"
+      Tags: 
+        - Key: Name
+          Value: !Sub "${PJPrefix}-alb"
+      # 内部向けかインターネット向け
+      Scheme: "internet-facing"
+      # ロードバランサーの属性
+      LoadBalancerAttributes:
+        # 削除保護が有効化されているかどうかを示します
+        - Key: "deletion_protection.enabled"
+          Value: false
+          # アイドルタイムアウト値
+        - Key: "idle_timeout.timeout_seconds"
+          Value: 60
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
+      Subnets: 
+        - !Ref Public1Subnet
+        - !Ref Public2Subnet
+
+  ALBListener: 
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    Properties: 
+      # デフォルトルールのアクション
+      DefaultActions:
+        - TargetGroupArn: !Ref TargetGroup
+          # ルールアクションタイプ
+          # forwardは指定されたターゲットグループにリクエストを転送
+          Type: forward
+      LoadBalancerArn: !Ref InternetALB
+      Port: 80
+      Protocol: HTTP
+
+  # InternetALBのセキュリティグループ
+  ALBSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      VpcId: !Ref VPC
+      GroupName: !Sub "${PJPrefix}-alb-sg"
+      GroupDescription: "-"
+      Tags:
+        - Key: "Name"
+          Value: !Sub "${PJPrefix}-alb-sg"
+
+  # ALBSecurityGroupのインプットルール
+  ALBSecurityGroupIngress: 
+    Type: "AWS::EC2::SecurityGroupIngress"
+    Properties: 
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      CidrIp: "0.0.0.0/0"
+      GroupId: !GetAtt [ ALBSecurityGroup, GroupId ]
+    
+  # ALBSecurityGroupのアウトプットルール
+  ALBSecurityGroupEgress1: 
+    Type: "AWS::EC2::SecurityGroupEgress"
+    Properties: 
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      SourceSecurityGroupId: !GetAtt [ Web1ServerSG, GroupId ] 
+      GroupId: !GetAtt [ ALBSecurityGroup, GroupId ]
+  ALBSecurityGroupEgress2: 
+    Type: "AWS::EC2::SecurityGroupEgress"
+    Properties: 
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      SourceSecurityGroupId: !GetAtt [ Web2ServerSG, GroupId ] 
+      GroupId: !GetAtt [ ALBSecurityGroup, GroupId ]
+
+# ------------------------------------------------------------#
+# Output Parameters
+# ------------------------------------------------------------#                
+Outputs:
+# VPC
+  VPC:
+    Value: !Ref VPC
+    Export:
+      Name: !Sub "${PJPrefix}-vpc"
+
+# Subnet
+  Public1Subnet:
+    Value: !Ref Public1Subnet
+    Export:
+      Name: !Sub "${PJPrefix}-public1-subnet"
+
+  Public2Subnet:
+    Value: !Ref Public2Subnet
+    Export:
+      Name: !Sub "${PJPrefix}-public2-subnet"
+      
+  Public1Subnet:
+    Value: !Ref Public1Subnet
+    Export:
+      Name: !Sub "${PJPrefix}-public1-subnet"
+
+  Public2Subnet:
+    Value: !Ref Public2Subnet
+    Export:
+      Name: !Sub "${PJPrefix}-public2-subnet"
+    
+# EC2
+  Web1Server:
+    Value: !Ref Web1Server
+    Export:
+      Name: !Sub "${PJPrefix}-web1-server"
+  Web2Server:
+    Value: !Ref Web2Server
+    Export:
+      Name: !Sub "${PJPrefix}-web2-server"
+# ALB
+  InternetALB:
+    Value: !Ref InternetALB
+    Export:
+      Name: !Sub "${PJPrefix}-alb"
