@@ -137,12 +137,13 @@ Resources:
       # Elastic IP アドレスが VPC のインスタンスで使用するか、
       # EC2-Classic のインスタンスで使用するか
       # ------------------------------------------------------
-      Domain: vpc                 
+      Domain: vpc  
+               
 # ------------------------------------------------------------#
 #  RouteTable
 # ------------------------------------------------------------#          
-# Public1 RouteTable Create
-  Public1RouteTable: 
+# Public RouteTable Create
+  PublicRouteTable: 
     Type: "AWS::EC2::RouteTable"
     Properties: 
       VpcId: !Ref VPC 
@@ -150,8 +151,8 @@ Resources:
         - Key: Name
           Value: !Sub "${PJPrefix}-public1-route"
 
-# Private1 RouteTable Create
-  Private1RouteTable: 
+# Private RouteTable Create
+  PrivateRouteTable: 
     Type: "AWS::EC2::RouteTable"
     Properties: 
       VpcId: !Ref VPC 
@@ -166,14 +167,14 @@ Resources:
   PublicRoute: 
     Type: "AWS::EC2::Route"
     Properties: 
-      RouteTableId: !Ref Public1RouteTable 
+      RouteTableId: !Ref PublicRouteTable 
       DestinationCidrBlock: "0.0.0.0/0"
       GatewayId: !Ref InternetGateway 
 
   PrivateRoute: 
     Type: "AWS::EC2::Route"
     Properties: 
-      RouteTableId: !Ref Private1RouteTable 
+      RouteTableId: !Ref PrivateRouteTable 
       DestinationCidrBlock: "0.0.0.0/0"
       NatGatewayId: !Ref NATGateway 
 
@@ -185,23 +186,23 @@ Resources:
     Type: "AWS::EC2::SubnetRouteTableAssociation"
     Properties: 
       SubnetId: !Ref Public1Subnet
-      RouteTableId: !Ref Public1RouteTable
+      RouteTableId: !Ref PublicRouteTable
   Public2SubnetRouteTableAssociation: 
     Type: "AWS::EC2::SubnetRouteTableAssociation"
     Properties: 
       SubnetId: !Ref Public2Subnet
-      RouteTableId: !Ref Public1RouteTable
+      RouteTableId: !Ref PublicRouteTable
 
   Private1SubnetRouteTableAssociation: 
     Type: "AWS::EC2::SubnetRouteTableAssociation"
     Properties: 
       SubnetId: !Ref Private1Subnet
-      RouteTableId: !Ref Private1RouteTable
+      RouteTableId: !Ref PrivateRouteTable
   Private2SubnetRouteTableAssociation: 
     Type: "AWS::EC2::SubnetRouteTableAssociation"
     Properties: 
       SubnetId: !Ref Private2Subnet
-      RouteTableId: !Ref Private1RouteTable
+      RouteTableId: !Ref PrivateRouteTable
 
 # ------------------------------------------------------------#
 # EC2
@@ -215,7 +216,7 @@ Resources:
       InstanceType: t2.micro
       NetworkInterfaces: 
         # IPv4 アドレスを割り当てるか
-        - AssociatePublicIpAddress: "true"
+        - AssociatePublicIpAddress: "false"
           # ------------------------------------------------------
           # アタッチの順序におけるネットワークインターフェイスの位置。
           # ネットワークインターフェイスを指定する場合必須
@@ -274,7 +275,7 @@ Resources:
       InstanceType: t2.micro
       NetworkInterfaces: 
         # IPv4 アドレスを割り当てるか
-        - AssociatePublicIpAddress: "true"
+        - AssociatePublicIpAddress: "false"
           # ------------------------------------------------------
           # アタッチの順序におけるネットワークインターフェイスの位置。
           # ネットワークインターフェイスを指定する場合必須
