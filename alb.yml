@@ -116,7 +116,28 @@ Resources:
       Tags: 
         - Key: Name
           Value: !Sub "${PJPrefix}-private2-subnet"
-                    
+
+# ------------------------------------------------------------#
+#  NAT Gateway
+# ------------------------------------------------------------#
+  NATGateway: 
+    Type: "AWS::EC2::NatGateway"
+    Properties:
+      # NAT ゲートウェイに関連付ける Elastic IPアドレスの割り当て ID
+      AllocationId: !GetAtt NATGatewayAEIP.AllocationId 
+      SubnetId: !Ref Public1Subnet
+      Tags: 
+        - Key: Name
+          Value: !Sub "${PJPrefix}-natgw"
+  # NATGateway For Elastic IP Create
+  NATGatewayAEIP: 
+    Type: "AWS::EC2::EIP"
+    Properties:
+      # ------------------------------------------------------
+      # Elastic IP アドレスが VPC のインスタンスで使用するか、
+      # EC2-Classic のインスタンスで使用するか
+      # ------------------------------------------------------
+      Domain: vpc                 
 # ------------------------------------------------------------#
 #  RouteTable
 # ------------------------------------------------------------#          
@@ -129,14 +150,6 @@ Resources:
         - Key: Name
           Value: !Sub "${PJPrefix}-public1-route"
 
-# # Public2 RouteTable Create
-#   Public2RouteTable: 
-#     Type: "AWS::EC2::RouteTable"
-#     Properties: 
-#       VpcId: !Ref VPC 
-#       Tags: 
-#         - Key: Name
-#           Value: !Sub "${PJPrefix}-public2-route"
 # Private1 RouteTable Create
   Private1RouteTable: 
     Type: "AWS::EC2::RouteTable"
@@ -145,16 +158,6 @@ Resources:
       Tags: 
         - Key: Name
           Value: !Sub "${PJPrefix}-private1-route"
-
-# # Private2 RouteTable Create
-#   Private2RouteTable: 
-#     Type: "AWS::EC2::RouteTable"
-#     Properties: 
-#       VpcId: !Ref VPC 
-#       Tags: 
-#         - Key: Name
-#           Value: !Sub "${PJPrefix}-private2-route"
-
 
 # ------------------------------------------------------------#
 # Routing
@@ -166,12 +169,13 @@ Resources:
       RouteTableId: !Ref Public1RouteTable 
       DestinationCidrBlock: "0.0.0.0/0"
       GatewayId: !Ref InternetGateway 
+
   PrivateRoute: 
     Type: "AWS::EC2::Route"
     Properties: 
       RouteTableId: !Ref Private1RouteTable 
       DestinationCidrBlock: "0.0.0.0/0"
-      GatewayId: !Ref InternetGateway 
+      NatGatewayId: !Ref NATGateway 
 
 # ------------------------------------------------------------#
 # RouteTable Associate
